@@ -1,0 +1,9 @@
+.env
+database/dump-*.sql
+storage/*
+!storage/.gitkeep
+public/uploads/*
+!public/uploads/.htaccess
+!public/uploads/.gitkeep
+__pycache__/
+node_modules/

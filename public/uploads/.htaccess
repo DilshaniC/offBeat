@@ -1,0 +1,8 @@
+Options -Indexes -ExecCGI
+<FilesMatch "(?i)\.(php[0-9]?|phtml|phar|cgi|pl|html?|svg|js)$">
+Require all denied
+</FilesMatch>
+<IfModule mod_php.c>
+php_flag engine off
+</IfModule>
+

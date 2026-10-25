@@ -1,0 +1,46 @@
+# Local compatibility fallback when Docker cannot extract/build new image layers.
+# Uses an existing MySQL 5.7 image; normal deployment should use compose.yaml (MySQL 8.4).
+name: offbeat-compat
+services:
+  db:
+    image: mysql:5.7.44
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-offbeat}
+      MYSQL_USER: ${DB_USERNAME:-offbeat}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Run scripts/configure.py first}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Run scripts/configure.py first}
+    volumes:
+      - compat_db:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, 'mysqladmin ping -h localhost -u root -p"$$MYSQL_ROOT_PASSWORD" --silent']
+      interval: 5s
+      timeout: 4s
+      retries: 30
+    mem_limit: 512m
+  web:
+    image: php:8.3-apache
+    ports:
+      - "127.0.0.1:${APP_PORT:-8088}:80"
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-offbeat}
+      DB_USERNAME: ${DB_USERNAME:-offbeat}
+      DB_PASSWORD: ${DB_PASSWORD}
+      APP_ENV: local
+    volumes:
+      - .:/var/www/html
+      - ./docker/php.ini:/usr/local/etc/php/conf.d/offbeat.ini:ro
+    command: [sh, -c, 'test -f /usr/local/etc/php/conf.d/docker-php-ext-pdo_mysql.ini || docker-php-ext-install pdo_mysql; a2enmod headers rewrite; sed -ri "s!/var/www/html!/var/www/html/public!g" /etc/apache2/sites-available/*.conf /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf; apache2-foreground']
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 256m
+    healthcheck:
+      test: [CMD-SHELL, 'php -r ''exit(extension_loaded("pdo_mysql") ? 0 : 1);''']
+      interval: 3s
+      timeout: 3s
+      retries: 40
+volumes:
+  compat_db:
